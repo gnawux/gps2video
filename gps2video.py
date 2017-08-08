@@ -4,7 +4,7 @@
 import ConfigParser
 
 def gps2video(config_file_path="config.ini"):
-	cf = ConfigParser.ConfigParser()
+	cf = ConfigParser.ConfigParser(allow_no_value=True)
 	try:
 		cfp = open(config_file_path)
 	except:
@@ -13,6 +13,7 @@ def gps2video(config_file_path="config.ini"):
 		print "不用担心不会配置，里面有中文注释。"
 		return
 	cf.readfp(cfp)
+	print cf.has_option("required", "gps_file")
 
 if __name__ == "__main__":
 	gps2video()
