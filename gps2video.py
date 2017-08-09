@@ -1,7 +1,7 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 
-import ConfigParser
+import ConfigParser, gpxpy, moviepy
 
 class gps2video_cf(ConfigParser.ConfigParser):
 	def __init__(self, config_file_path):
@@ -25,6 +25,15 @@ class gps2video_cf(ConfigParser.ConfigParser):
 		if not ret:
 			print section,"中的项目", option, "没设置啊！"
 
+class gps:
+	def __init__(self, gps_file):
+		self.gfp = open(gps_file)
+		self.gpx = gpxpy.parse(gpx_file)
+
+	def __del__(self):
+		if hasattr(self, 'gfp'):
+			self.gfp.close()
+
 
 def gps2video(config_file_path="config.ini"):
 	global cf
@@ -39,6 +48,7 @@ def gps2video(config_file_path="config.ini"):
 	
 	if not cf.has_option_with_output("required", "gps_file"):
 		return
+	
 	
 
 if __name__ == "__main__":
