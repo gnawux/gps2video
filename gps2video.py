@@ -67,10 +67,6 @@ class gps_class:
 						self.max_longitude = point.longitude
 					if self.min_longitude == None or point.longitude < self.min_longitude:
 						self.min_longitude = point.longitude
-		self.latitude_size = self.max_latitude - self.min_latitude
-		self.longitude_size = self.max_longitude - self.min_longitude
-		self.latitude = self.min_latitude + (self.latitude_size / 2)
-		self.longitude = self.min_longitude + (self.longitude_size / 2)
 
 	def write_video(self, m):
 		vw = cv2.VideoWriter(os.path.join(self.cf.output_dir, 'v.avi'),
@@ -86,6 +82,10 @@ class gps_class:
 
 class map_class:
 	def __init__(self, cf, gps):
+		self.cbk = [128, 256, 512, 1024, 2048, 4096, 8192, 16384, 32768, 65536, 131072, 262144, 524288, 1048576, 2097152, 4194304, 8388608, 16777216, 33554432, 67108864, 134217728, 268435456, 536870912, 1073741824, 2147483648, 4294967296, 8589934592, 17179869184, 34359738368, 68719476736, 137438953472]
+		self.cek = [0.7111111111111111, 1.4222222222222223, 2.8444444444444446, 5.688888888888889, 11.377777777777778, 22.755555555555556, 45.51111111111111, 91.02222222222223, 182.04444444444445, 364.0888888888889, 728.1777777777778, 1456.3555555555556, 2912.711111111111, 5825.422222222222, 11650.844444444445, 23301.68888888889, 46603.37777777778, 93206.75555555556, 186413.51111111112, 372827.02222222224, 745654.0444444445, 1491308.088888889, 2982616.177777778, 5965232.355555556, 11930464.711111112, 23860929.422222223, 47721858.844444446, 95443717.68888889, 190887435.37777779, 381774870.75555557, 763549741.5111111]
+		self.cfk = [40.74366543152521, 81.48733086305042, 162.97466172610083, 325.94932345220167, 651.8986469044033, 1303.7972938088067, 2607.5945876176133, 5215.189175235227, 10430.378350470453, 20860.756700940907, 41721.51340188181, 83443.02680376363, 166886.05360752725, 333772.1072150545, 667544.214430109, 1335088.428860218, 2670176.857720436, 5340353.715440872, 10680707.430881744, 21361414.86176349, 42722829.72352698, 85445659.44705395, 170891318.8941079, 341782637.7882158, 683565275.5764316, 1367130551.1528633, 2734261102.3057265, 5468522204.611453, 10937044409.222906, 21874088818.445812, 43748177636.891624]
+
 		self.gps = gps
 		self.cf = cf
 		self.prev_x = None
@@ -113,10 +113,9 @@ class map_class:
 			raise Exception("你把video_border设置这么大不怕系统爆炸吗？")
 		self.real_width = self.width - b_tmp
 		self.real_height = self.height - b_tmp
-		self.get_zoom()
-		self.x = float(self.width) / 2
-		self.y = float(self.height) / 2
-		#print "缩放率是",self.zoom
+
+		self.get_zoom_and_center(self.width - b_tmp, self.height - b_tmp)
+		print "缩放率是", self.zoom
 
 		self.map_key = cf.get("required", "google_map_key")
 
@@ -124,24 +123,51 @@ class map_class:
 		if self.map_type != "roadmap" and self.map_type != "satellite" and self.map_type != "terrain" and self.map_type != "hybrid":
 			raise Exception("地图类型"+self.map_type+"是什么鬼？")
 
-	def get_zoom(self):
-		self.zoom = int(math.log(self.real_width / self.gps.longitude_size, 2))
-		h_zoom = int(math.log(self.real_height / self.gps.latitude_size, 2))
-		if h_zoom < self.zoom:
-			self.zoom = h_zoom
-		if self.zoom > 15:
-			self.zoom = 15
-		self.times = 2 ** self.zoom
+	#下面这两个函数取自 https://github.com/whit537/gheat/blob/master/__/lib/python/gmerc.py
+	def gps_to_global_pixel(self, latitude, longitude):
+		cbk = self.cbk[self.zoom]
+		x = round(cbk + (longitude * self.cek[self.zoom]))
+		foo = math.sin(latitude * math.pi / 180)
+		if foo < -0.9999:
+			foo = -0.9999
+		elif foo > 0.9999:
+			foo = 0.9999
+		y = round(cbk + (0.5 * math.log((1+foo)/(1-foo)) * (-self.cfk[self.zoom])))
+
+		return x, y
+
+	def global_pixel_to_gps(self, x, y):
+		foo = self.cbk[self.zoom]
+		longitude = (x - foo) / self.cek[self.zoom]
+		bar = (y - foo) / -self.cfk[self.zoom]
+		blam = 2 * math.atan(math.exp(bar)) - math.pi / 2
+		latitude = blam / (math.pi / 180)
+
+		return latitude, longitude
+
+	def get_zoom_and_center(self, width, height):
+		for self.zoom in range(20, -1, -1):
+			min_x, max_y = self.gps_to_global_pixel(self.gps.min_latitude, self.gps.min_longitude)
+			max_x, min_y = self.gps_to_global_pixel(self.gps.max_latitude, self.gps.max_longitude)
+			if max_x - min_x < width and max_y - min_y < height:
+				break
+
+		self.center_gx = min_x + float(max_x - min_x) / 2
+		self.center_gy = min_y + float(max_y - min_y) / 2
+		self.center_latitude, self.center_longitude = self.global_pixel_to_gps(self.center_gx, self.center_gy)
+		self.center_x = float(self.width - 1) / 2
+		self.center_y = float(self.height - 1) / 2
 
 	def gps_to_pixel(self, latitude, longitude):
-		y = round(self.y - (latitude - self.gps.latitude) * self.times)
-		x = round(self.x - (self.gps.longitude - longitude) * self.times)
-		return int(x), int(y)
+		gx, gy = self.gps_to_global_pixel(latitude, longitude)
+		x = int(round(gx - self.center_gx + self.center_x))
+		y = int(round(gy - self.center_gy + self.center_y))
+		return x, y
 
 	def get_map(self):
 		url = "https://maps.googleapis.com/maps/api/staticmap?format=png"
 		url += "&key=" + self.map_key
-		url += "&center=" + str(self.gps.latitude) + "," + str(self.gps.longitude)
+		url += "&center=" + str(self.center_latitude) + "," + str(self.center_longitude)
 		url += "&zoom=" + str(self.zoom)
 		url += "&size=" + str(self.width) + "x" + str(self.height)
 		url += "&maptype=" + self.map_type
@@ -161,11 +187,12 @@ class map_class:
 	def write_video(self, vw, latitude, longitude):
 		x, y = self.gps_to_pixel(latitude, longitude)
 		if self.prev_x != None:
-			cv2.line(self.img, (self.prev_x, self.prev_y), (x, y), (0, 0, 0), 3, lineType=cv2.CV_AA)
-		cv2.circle(self.img, (x, y), 0, (0, 0, 0), 3, lineType=cv2.CV_AA)
+			cv2.line(self.img, (self.prev_x, self.prev_y), (x, y), (255, 255, 255), 3, lineType=cv2.CV_AA)
+		cv2.circle(self.img, (x, y), 0, (255, 255, 255), 3, lineType=cv2.CV_AA)
 		vw.write(self.img)
 		self.prev_x = x
 		self.prev_y = y
+		cv2.imwrite("./out.png", self.img)
 
 	def write_video_last(self, vw):
 		for i in range(36 * 2):
