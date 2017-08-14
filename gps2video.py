@@ -91,21 +91,21 @@ class map_class:
 		self.prev_x = None
 		self.prev_y = None
 
-		self.premium = False
+		self.size_max = 640
 		if cf.has_option("optional", "google_map_premium"):
-			self.premium = cf.get("optional", "google_map_premium")
-			if self.premium == "yes":
-				self.premium = True
-			elif self.premium == "no":
-				self.premium = False
+			premium = cf.get("optional", "google_map_premium")
+			if premium == "yes":
+				self.size_max = 2048
+			elif premium == "no":
+				self.size_max = 640
 			else:
 				raise Exception("你到底是不是google map premium，写清楚！")
 
 		self.width = cf.getint("required", "video_width")
-		if not self.premium and self.width > 640:
+		if self.width > self.size_max:
 			raise Exception("你把video_width设置这么大不怕系统爆炸吗？")
 		self.height = cf.getint("required", "video_height")
-		if not self.premium and self.height > 640:
+		if self.height > self.size_max:
 			raise Exception("你把video_height设置这么大不怕系统爆炸吗？")
 		self.border = cf.getint("required", "video_border")
 		b_tmp = self.border * 2
@@ -192,7 +192,6 @@ class map_class:
 		vw.write(self.img)
 		self.prev_x = x
 		self.prev_y = y
-		cv2.imwrite("./out.png", self.img)
 
 	def write_video_last(self, vw):
 		for i in range(36 * 2):
