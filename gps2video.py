@@ -69,8 +69,13 @@ class gps_class:
 						self.min_longitude = point.longitude
 
 	def write_video(self, m):
+                fcc = None
+                if hasattr(cv2, 'VideoWriter_fourcc'):
+                    fcc = cv2.VideoWriter_fourcc
+                else:
+                    fcc = cv2.cv.CV_FOURCC
 		vw = cv2.VideoWriter(os.path.join(self.cf.output_dir, 'v.avi'),
-				     fourcc = cv2.cv.CV_FOURCC('D','I', 'V','X'),
+				     fourcc = fcc('D','I', 'V','X'),
 				     fps = 36,
 				     frameSize = (m.width, m.height))
 		for track in self.rec.tracks:
@@ -186,10 +191,15 @@ class map_class:
 		self.img = cv2.imread(self.pic)
 
 	def write_video(self, vw, latitude, longitude):
+                aa = None
+                if hasattr(cv2, 'CV_AA'):
+                    aa = cv2.CV_AA
+                else:
+                    aa = cv2.LINE_AA
 		x, y = self.gps_to_pixel(latitude, longitude)
 		if self.prev_x != None:
-			cv2.line(self.img, (self.prev_x, self.prev_y), (x, y), (255, 255, 255), 3, lineType=cv2.CV_AA)
-		cv2.circle(self.img, (x, y), 0, (255, 255, 255), 3, lineType=cv2.CV_AA)
+			cv2.line(self.img, (self.prev_x, self.prev_y), (x, y), (255, 255, 255), 3, lineType=aa)
+		cv2.circle(self.img, (x, y), 0, (255, 255, 255), 3, lineType=aa)
 		vw.write(self.img)
 		self.prev_x = x
 		self.prev_y = y
